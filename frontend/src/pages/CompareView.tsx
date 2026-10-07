@@ -75,6 +75,10 @@ export default function CompareView() {
     lines.push(`尺寸/重量：${specimen.dimensions} mm / ${specimen.weight} g`);
     lines.push(`当前状态：${specimen.status}`);
     lines.push(`工序完成度：${progress.done}/${progress.total}（${progress.percent}%）`);
+    const pendingConflicts = progress.list.filter((n) => (n.conflicts ?? []).some((c) => c.status === 'pending')).length;
+    if (pendingConflicts > 0) {
+      lines.push(`待核分叉：${pendingConflicts} 个工序存在两版待核，请到「离线合并」核定后再定稿`);
+    }
     lines.push(
       `工序节点：${
         progress.list.length === 0

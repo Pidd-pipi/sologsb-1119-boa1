@@ -18,9 +18,15 @@ export interface PrepPhoto {
   caption: string;
   dataUrl: string;
   capturedAt: number;
+  /** 影像内容指纹：同标本 + 同拍摄时间 + 同内容视为重复，只留一条 */
+  contentHash: string;
+  /** 修订号 */
+  rev: number;
+  /** 最近改动时间（合并时重新归挂工序/阶段会更新） */
+  updatedAt: number;
 }
 
-export type PrepPhotoDraft = Omit<PrepPhoto, 'id'>;
+export type PrepPhotoDraft = Omit<PrepPhoto, 'id' | 'rev' | 'updatedAt'>;
 
 /** 生成一张内联 SVG 影像（无相机时作为留痕示意图，全部内容本地生成，不依赖网络） */
 export function makeSketchDataUrl(label: string, tone: string): string {

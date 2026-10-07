@@ -20,6 +20,7 @@ import { MeasureField } from '../components/common/MeasureField';
 import { STEP_FIELD_MAP, STEP_TYPES, type StepType } from '../types/procedure';
 import { db } from '../utils/db';
 import { newId } from '../utils/id';
+import { photoContentHash } from '../utils/hash';
 import { makeSketchDataUrl, type PrepPhoto } from '../types/photo';
 
 /** /procedures/new 新建工序节点：选类型动态出字段，序号跳号报错 */
@@ -30,6 +31,7 @@ export default function ProcedureForm() {
   const addProcedure = useProcedureStore((s) => s.add);
   const finish = useProcedureStore((s) => s.finish);
   const rollback = useProcedureStore((s) => s.rollback);
+  const reloadProcedures = useProcedureStore((s) => s.load);
 
   const [specimenId, setSpecimenId] = useState(params.get('specimenId') ?? specimens[0]?.id ?? '');
   const [stepType, setStepType] = useState<StepType>('清修');
@@ -100,14 +102,20 @@ export default function ProcedureForm() {
     });
 
     if (withPhotos && specimen) {
+      const beforeUrl = makeSketchDataUrl(`修复前 · ${specimen.specimenNo}`, '#6b5844');
+      const afterUrl = makeSketchDataUrl(`修复后 · ${specimen.specimenNo}`, '#3f5a4a');
+      const nowTs = Date.now();
       const before: PrepPhoto = {
         id: newId('pho'),
         specimenId,
         procedureId: record.id,
         stage: 'before',
         caption: `${nodeName.trim()} · 修复前（${specimen.specimenNo}）`,
-        dataUrl: makeSketchDataUrl(`修复前 · ${specimen.specimenNo}`, '#6b5844'),
-        capturedAt: Date.now(),
+        dataUrl: beforeUrl,
+        capturedAt: nowTs,
+        contentHash: photoContentHash(beforeUrl),
+        rev: 1,
+        updatedAt: nowTs,
       };
       const after: PrepPhoto = {
         id: newId('pho'),
@@ -115,10 +123,21 @@ export default function ProcedureForm() {
         procedureId: record.id,
         stage: 'after',
         caption: `${nodeName.trim()} · 修复后（${specimen.specimenNo}）`,
-        dataUrl: makeSketchDataUrl(`修复后 · ${specimen.specimenNo}`, '#3f5a4a'),
-        capturedAt: Date.now() + 1,
+        dataUrl: afterUrl,
+        capturedAt: nowTs + 1,
+        contentHash: photoContentHash(afterUrl),
+        rev: 1,
+        updatedAt: nowTs + 1,
       };
       await db.photos.bulkPut([before, after]);
+      // 影像挂接后同步工序修订号
+      await db.procedures.update(record.id, {
+        photoBeforeIds: [before.id],
+        photoAfterIds: [after.id],
+        rev: record.rev + 1,
+        updatedAt: Date.now(),
+      });
+      await reloadProcedures();
     }
 
     setError('');

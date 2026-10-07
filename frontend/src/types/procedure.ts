@@ -43,8 +43,8 @@ export const STEP_FIELD_MAP: Record<
 /** 工序节点状态 */
 export type ProcedureState = 'pending' | 'done' | 'rolledback';
 
-/** 修复工序 */
-export interface PrepProcedure {
+/** 工序业务字段（修订跟踪部分除外），供留痕包版本与待核快照复用 */
+export interface PrepProcedureBase {
   id: string;
   specimenId: string;
   stepType: StepType;
@@ -72,6 +72,33 @@ export interface PrepProcedure {
   startedAt: number;
   state: ProcedureState;
   finishedAt?: number;
+  /** 修订号，每次改动自增；旧数据回填为 1 */
+  rev: number;
+  /** 最近改动时间 */
+  updatedAt: number;
 }
 
-export type PrepProcedureDraft = Omit<PrepProcedure, 'id'>;
+/** 留痕包里的工序版本（不含待核元数据） */
+export type PrepProcedureRevision = PrepProcedureBase;
+
+/** 待核分叉：同一工序两边都改过时，保留两版 */
+export interface ProcedureConflict {
+  /** 待核来源：local 本机版 / remote 留痕包版 */
+  side: 'local' | 'remote';
+  /** 共同版本修订号 */
+  baseRev: number;
+  /** 该版内容（工序快照，不含待核元数据，避免递归引用） */
+  snapshot: PrepProcedureRevision;
+  /** 待核状态：pending 未定 / kept 核定保留此版 / discarded 核定舍弃此版 */
+  status: 'pending' | 'kept' | 'discarded';
+  /** 进入待核的时间 */
+  flaggedAt: number;
+}
+
+/** 修复工序 */
+export interface PrepProcedure extends PrepProcedureBase {
+  /** 两版待核记录；为空表示无分叉 */
+  conflicts: ProcedureConflict[];
+}
+
+export type PrepProcedureDraft = Omit<PrepProcedure, 'id' | 'rev' | 'updatedAt' | 'conflicts'>;

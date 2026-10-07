@@ -23,6 +23,10 @@ export interface SupplyLot {
   lowThreshold: number;
   /** 最近一次领用记录 */
   issues: SupplyIssue[];
+  /** 修订号，每次改动（含领用）自增；旧数据回填为 1 */
+  rev: number;
+  /** 最近改动时间 */
+  updatedAt: number;
 }
 
 /** 领用登记 */
@@ -34,7 +38,7 @@ export interface SupplyIssue {
   issuedAt: number;
 }
 
-export type SupplyLotDraft = Omit<SupplyLot, 'id' | 'issues'>;
+export type SupplyLotDraft = Omit<SupplyLot, 'id' | 'issues' | 'rev' | 'updatedAt'>;
 
 /** 是否低量 */
 export function isLowStock(lot: SupplyLot): boolean {

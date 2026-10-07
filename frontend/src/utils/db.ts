@@ -4,10 +4,11 @@ import type { PrepProcedure } from '../types/procedure';
 import type { SupplyLot } from '../types/supply';
 import type { PrepPhoto } from '../types/photo';
 import { makeSketchDataUrl } from '../types/photo';
+import { photoContentHash } from './hash';
 import { newId } from './id';
 
 /** 当前数据结构版本，写入 localStorage 便于回显 */
-export const DB_VERSION = 2;
+export const DB_VERSION = 3;
 export const DB_NAME = 'gbfossilprep';
 export const LS_VERSION_KEY = 'gbfossilprep:db-version';
 
@@ -52,6 +53,53 @@ class FossilPrepDB extends Dexie {
           .modify((row: any) => {
             if (!row.issues) row.issues = [];
             if (row.lowThreshold === undefined) row.lowThreshold = 1;
+          });
+      });
+    // v3：离线合并所需的修订号、更新时间、待核分叉、影像内容指纹
+    this.version(3)
+      .stores({
+        specimens: 'id, specimenNo, taxon, locality, status, createdAt',
+        procedures: 'id, specimenId, seq, stepType, state, startedAt',
+        supplies: 'id, kind, lotNo, name, openedAt',
+        photos: 'id, specimenId, procedureId, stage, capturedAt',
+      })
+      .upgrade(async (tx) => {
+        // 旧数据无修订号：按当前值回填 rev=1，updatedAt 取已有时间字段
+        await tx
+          .table('specimens')
+          .toCollection()
+          .modify((row: any) => {
+            if (typeof row.rev !== 'number') row.rev = 1;
+            if (typeof row.updatedAt !== 'number') row.updatedAt = row.createdAt ?? Date.now();
+          });
+        await tx
+          .table('procedures')
+          .toCollection()
+          .modify((row: any) => {
+            if (typeof row.rev !== 'number') row.rev = 1;
+            if (typeof row.updatedAt !== 'number') row.updatedAt = row.finishedAt ?? row.startedAt ?? Date.now();
+            if (!Array.isArray(row.conflicts)) row.conflicts = [];
+          });
+        await tx
+          .table('supplies')
+          .toCollection()
+          .modify((row: any) => {
+            if (typeof row.rev !== 'number') row.rev = 1;
+            const lastIssue =
+              Array.isArray(row.issues) && row.issues.length > 0
+                ? Math.max(...row.issues.map((i: any) => i.issuedAt ?? 0))
+                : 0;
+            if (typeof row.updatedAt !== 'number') {
+              row.updatedAt = Math.max(row.openedAt ?? 0, lastIssue, Date.now());
+            }
+          });
+        await tx
+          .table('photos')
+          .toCollection()
+          .modify((row: any) => {
+            if (typeof row.rev !== 'number') row.rev = 1;
+            if (typeof row.updatedAt !== 'number') row.updatedAt = row.capturedAt ?? Date.now();
+            if (!row.contentHash) row.contentHash = photoContentHash(String(row.dataUrl ?? ''));
           });
       });
   }
@@ -101,6 +149,8 @@ export async function ensureSeedData(): Promise<void> {
       storageBox: 'A 区 3 匣 2 格',
       status: '修复中',
       createdAt: now - 12 * day,
+      rev: 2,
+      updatedAt: now - 9 * day,
     },
     {
       id: specimenId2,
@@ -115,6 +165,8 @@ export async function ensureSeedData(): Promise<void> {
       storageBox: 'B 区 1 匣 4 格',
       status: '待清修',
       createdAt: now - 5 * day,
+      rev: 1,
+      updatedAt: now - 5 * day,
     },
   ];
 
@@ -138,6 +190,9 @@ export async function ensureSeedData(): Promise<void> {
       startedAt: now - 10 * day,
       state: 'done',
       finishedAt: now - 10 * day + 145 * 60000,
+      rev: 2,
+      updatedAt: now - 9 * day,
+      conflicts: [],
     },
     {
       id: newId('prc'),
@@ -157,6 +212,9 @@ export async function ensureSeedData(): Promise<void> {
       operator: '林砚秋',
       startedAt: now - 6 * day,
       state: 'pending',
+      rev: 1,
+      updatedAt: now - 6 * day,
+      conflicts: [],
     },
   ];
 
@@ -169,6 +227,9 @@ export async function ensureSeedData(): Promise<void> {
       caption: '清修前 · 左侧肩胛区围岩包裹',
       dataUrl: makeSketchDataUrl('清修前 · FP-2024-0031', '#6b5844'),
       capturedAt: now - 10 * day,
+      contentHash: '',
+      rev: 1,
+      updatedAt: now - 10 * day,
     },
     {
       id: newId('pho'),
@@ -178,8 +239,14 @@ export async function ensureSeedData(): Promise<void> {
       caption: '清修后 · 肩胛骨轮廓显露',
       dataUrl: makeSketchDataUrl('清修后 · FP-2024-0031', '#3f5a4a'),
       capturedAt: now - 9 * day,
+      contentHash: '',
+      rev: 1,
+      updatedAt: now - 9 * day,
     },
   ];
+  photos.forEach((p) => {
+    p.contentHash = photoContentHash(p.dataUrl);
+  });
   procedures[0].photoBeforeIds = [photos[0].id];
   procedures[0].photoAfterIds = [photos[1].id];
 
@@ -204,6 +271,8 @@ export async function ensureSeedData(): Promise<void> {
           issuedAt: now - 6 * day,
         },
       ],
+      rev: 2,
+      updatedAt: now - 6 * day,
     },
     {
       id: newId('sup'),
@@ -217,6 +286,8 @@ export async function ensureSeedData(): Promise<void> {
       shelfLifeMonths: 60,
       lowThreshold: 2,
       issues: [],
+      rev: 1,
+      updatedAt: now - 60 * day,
     },
     {
       id: newId('sup'),
@@ -230,6 +301,8 @@ export async function ensureSeedData(): Promise<void> {
       shelfLifeMonths: 120,
       lowThreshold: 5,
       issues: [],
+      rev: 1,
+      updatedAt: now - 90 * day,
     },
     {
       id: newId('sup'),
@@ -243,6 +316,8 @@ export async function ensureSeedData(): Promise<void> {
       shelfLifeMonths: 120,
       lowThreshold: 1,
       issues: [],
+      rev: 1,
+      updatedAt: now - 200 * day,
     },
   ];
 

@@ -13,6 +13,7 @@ import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import RadioButtonUncheckedIcon from '@mui/icons-material/RadioButtonUnchecked';
 import UndoIcon from '@mui/icons-material/Undo';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import GavelIcon from '@mui/icons-material/Gavel';
 import type { PrepProcedure } from '../../types/procedure';
 
 export interface ProcedureTimelineProps {
@@ -51,6 +52,7 @@ export function ProcedureTimeline({ items, onFinish, onRollback, onOpenPhoto }: 
       {items.map((node, index) => {
         const isDone = node.state === 'done';
         const open = expanded === node.id;
+        const pendingConflicts = (node.conflicts ?? []).filter((c) => c.status === 'pending').length;
         return (
           <Box key={node.id} sx={{ display: 'flex', gap: 1.5 }}>
             <Stack alignItems="center" sx={{ pt: 0.5 }}>
@@ -74,6 +76,17 @@ export function ProcedureTimeline({ items, onFinish, onRollback, onOpenPhoto }: 
                   label={node.state === 'done' ? '已完成' : node.state === 'rolledback' ? '已回退' : '待办'}
                   color={isDone ? 'success' : node.state === 'rolledback' ? 'error' : 'default'}
                 />
+                {pendingConflicts > 0 ? (
+                  <Chip
+                    size="small"
+                    color="warning"
+                    icon={<GavelIcon />}
+                    label={`${pendingConflicts} 版待核`}
+                    component="a"
+                    href="#/sync"
+                    clickable
+                  />
+                ) : null}
                 <Typography variant="caption" color="text.secondary">
                   耗时 {node.durationMin} min · 责任人 {node.operator}
                 </Typography>

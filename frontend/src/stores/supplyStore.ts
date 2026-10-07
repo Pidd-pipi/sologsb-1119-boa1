@@ -10,6 +10,8 @@ interface SupplyState {
   add: (draft: SupplyLotDraft) => Promise<SupplyLot>;
   issue: (id: string, payload: Omit<SupplyIssue, 'id' | 'issuedAt'>) => Promise<void>;
   trace: (lotNo: string) => SupplyLot[];
+  /** 离线合并后整体刷新 */
+  hydrate: (items: SupplyLot[]) => void;
 }
 
 export const useSupplyStore = create<SupplyState>((set, get) => ({
@@ -21,7 +23,8 @@ export const useSupplyStore = create<SupplyState>((set, get) => ({
     set({ items, loaded: true });
   },
   async add(draft) {
-    const record: SupplyLot = { ...draft, id: newId('sup'), issues: [] };
+    const now = Date.now();
+    const record: SupplyLot = { ...draft, id: newId('sup'), issues: [], rev: 1, updatedAt: now };
     await db.supplies.put(record);
     set({ items: [...get().items, record] });
     return record;
@@ -30,10 +33,13 @@ export const useSupplyStore = create<SupplyState>((set, get) => ({
     const target = get().items.find((it) => it.id === id);
     if (!target) return;
     const issue: SupplyIssue = { ...payload, id: newId('iss'), issuedAt: Date.now() };
+    // 领用扣减余量并自增修订号；合并材料余量时以最新修订为准重算
     const next: SupplyLot = {
       ...target,
       qty: Math.max(0, target.qty - payload.qty),
       issues: [issue, ...target.issues],
+      rev: target.rev + 1,
+      updatedAt: issue.issuedAt,
     };
     await db.supplies.put(next);
     set({ items: get().items.map((it) => (it.id === id ? next : it)) });
@@ -41,5 +47,8 @@ export const useSupplyStore = create<SupplyState>((set, get) => ({
   trace(lotNo) {
     if (!lotNo) return get().items;
     return get().items.filter((it) => it.lotNo.includes(lotNo) || it.name.includes(lotNo));
+  },
+  hydrate(items) {
+    set({ items });
   },
 }));
