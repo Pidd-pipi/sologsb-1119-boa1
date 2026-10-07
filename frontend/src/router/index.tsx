@@ -19,6 +19,7 @@ import SpecimenDetail from '../pages/SpecimenDetail';
 import ProcedureForm from '../pages/ProcedureForm';
 import SupplyList from '../pages/SupplyList';
 import CompareView from '../pages/CompareView';
+import SyncCenter from '../pages/SyncCenter';
 
 function Shell() {
   const location = useLocation();
@@ -32,6 +33,7 @@ function Shell() {
       { label: '标本台账', path: '/specimens' },
       { label: '工序录入', path: '/procedures/new' },
       { label: '材料台账', path: '/supplies' },
+      { label: '离线合并', path: '/sync' },
       { label: '前后对照', path: firstId ? `/compare/${firstId}` : '/specimens' },
     ];
   }, [specimens]);
@@ -66,6 +68,7 @@ function Shell() {
           <Route path="/specimens/:id" element={<SpecimenDetail />} />
           <Route path="/procedures/new" element={<ProcedureForm />} />
           <Route path="/supplies" element={<SupplyList />} />
+          <Route path="/sync" element={<SyncCenter />} />
           <Route path="/compare/:specimenId" element={<CompareView />} />
           <Route path="*" element={<Navigate to="/specimens" replace />} />
         </Routes>

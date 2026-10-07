@@ -74,6 +74,20 @@ export function ProcedureTimeline({ items, onFinish, onRollback, onOpenPhoto }: 
                   label={node.state === 'done' ? '已完成' : node.state === 'rolledback' ? '已回退' : '待办'}
                   color={isDone ? 'success' : node.state === 'rolledback' ? 'error' : 'default'}
                 />
+                {node.conflictId ? (
+                  <Chip
+                    size="small"
+                    color="warning"
+                    variant={node.conflictSide === 'museum' ? 'filled' : 'outlined'}
+                    label={node.conflictSide === 'museum' ? '待核 · 馆内版' : '待核 · 合作室版'}
+                    data-testid={`conflict-badge-${node.conflictId}`}
+                  />
+                ) : null}
+                {node.rev !== undefined ? (
+                  <Tooltip title={`修订号 r${node.rev}${node.updatedAt ? ` · ${fmtTime(node.updatedAt)}` : ''}`}>
+                    <Chip size="small" variant="outlined" label={`r${node.rev}`} />
+                  </Tooltip>
+                ) : null}
                 <Typography variant="caption" color="text.secondary">
                   耗时 {node.durationMin} min · 责任人 {node.operator}
                 </Typography>

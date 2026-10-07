@@ -110,6 +110,15 @@ export default function SpecimenDetail() {
             <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 1 }}>
               <Typography variant="subtitle2">工序完成度</Typography>
               <Chip size="small" label={`${progress.done}/${progress.total}`} />
+              {progress.conflictCount > 0 ? (
+                <Chip
+                  size="small"
+                  color="warning"
+                  label={`${progress.conflictCount} 处两版待核`}
+                  onClick={() => navigate('/sync')}
+                  data-testid="detail-conflict-chip"
+                />
+              ) : null}
               {progress.gaps.length > 0 ? (
                 <Chip size="small" color="error" label={`跳号 ${progress.gaps.join(',')}`} />
               ) : (
@@ -123,6 +132,7 @@ export default function SpecimenDetail() {
             </Typography>
             <Typography variant="body2" color="text.secondary">
               已回退节点 {progress.rolledback} 个 · 完成率 {progress.percent}%
+              {progress.conflictCount > 0 ? '（待核工序暂按馆内版计入）' : ''}
             </Typography>
           </Paper>
         </Stack>

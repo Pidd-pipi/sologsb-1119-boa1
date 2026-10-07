@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
-    "preview": "vite preview --port 5173"
+    "preview": "vite preview --port 5173",
+    "test:smoke": "tsx scripts/smoke-sync.ts"
   },
   "dependencies": {
     "@emotion/react": "^11.13.3",
@@ -23,6 +24,8 @@
     "@types/react": "^18.3.10",
     "@types/react-dom": "^18.3.0",
     "@vitejs/plugin-react": "^4.3.1",
+    "fake-indexeddb": "^6.2.5",
+    "tsx": "^4.23.15",
     "typescript": "^5.6.2",
     "vite": "^5.4.8"
   }

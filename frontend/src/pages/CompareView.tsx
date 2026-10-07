@@ -55,13 +55,13 @@ export default function CompareView() {
 
   const markers = useMemo(
     () =>
-      progress.list.slice(0, 4).map((node, index) => ({
+      progress.canonical.slice(0, 4).map((node, index) => ({
         id: `M${index + 1}`,
         x: 18 + index * 20,
         y: 30 + (index % 2) * 26,
         text: `#${node.seq} ${node.stepType} · ${node.nodeName}`,
       })),
-    [progress.list],
+    [progress.canonical],
   );
 
   const statement = useMemo(() => {
@@ -75,11 +75,14 @@ export default function CompareView() {
     lines.push(`尺寸/重量：${specimen.dimensions} mm / ${specimen.weight} g`);
     lines.push(`当前状态：${specimen.status}`);
     lines.push(`工序完成度：${progress.done}/${progress.total}（${progress.percent}%）`);
+    if (progress.conflictCount > 0) {
+      lines.push(`待核提示：有 ${progress.conflictCount} 处工序馆内 / 合作室两版待核，完成度暂按馆内版计算`);
+    }
     lines.push(
       `工序节点：${
-        progress.list.length === 0
+        progress.canonical.length === 0
           ? '无'
-          : progress.list.map((n) => `#${n.seq}${n.stepType}(${n.nodeName}·${n.state === 'done' ? '已完成' : n.state === 'rolledback' ? '已回退' : '待办'})`).join(' → ')
+          : progress.canonical.map((n) => `#${n.seq}${n.stepType}(${n.nodeName}·${n.state === 'done' ? '已完成' : n.state === 'rolledback' ? '已回退' : '待办'})`).join(' → ')
       }`,
     );
     lines.push(`修复前影像：${before ? `${PHOTO_STAGE_LABEL[before.stage]} · ${before.caption}` : '未选'}`);
@@ -210,13 +213,13 @@ export default function CompareView() {
             <Typography variant="subtitle1" fontWeight={700} gutterBottom>
               工序节点对照
             </Typography>
-            {progress.list.length === 0 ? (
+            {progress.canonical.length === 0 ? (
               <Typography variant="body2" color="text.secondary">
                 暂无工序节点。
               </Typography>
             ) : (
               <Stack spacing={0.5}>
-                {progress.list.map((n) => (
+                {progress.canonical.map((n) => (
                   <Stack key={n.id} direction="row" spacing={1} alignItems="center">
                     <Typography variant="body2">
                       #{n.seq} {n.stepType} · {n.nodeName}

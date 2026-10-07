@@ -119,6 +119,11 @@ export default function ProcedureForm() {
         capturedAt: Date.now() + 1,
       };
       await db.photos.bulkPut([before, after]);
+      // 影像挂接回工序修订（按阶段归入对应 id 数组）
+      await db.procedures.update(record.id, {
+        photoBeforeIds: [before.id],
+        photoAfterIds: [after.id],
+      });
     }
 
     setError('');

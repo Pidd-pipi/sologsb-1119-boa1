@@ -7,15 +7,40 @@ import { makeSketchDataUrl } from '../types/photo';
 import { newId } from './id';
 
 /** 当前数据结构版本，写入 localStorage 便于回显 */
-export const DB_VERSION = 2;
+export const DB_VERSION = 3;
 export const DB_NAME = 'gbfossilprep';
 export const LS_VERSION_KEY = 'gbfossilprep:db-version';
+
+/** syncState 行键 */
+export const SYNC_STATE_KEY = 'lastSync';
+export const SYNC_LOCK_KEY = 'mergeLock';
+
+/** 最近一次成功合并后留存的基线（三方合并的 base），值结构见 sync/merge.ts */
+export interface SyncStateRow {
+  key: string;
+  value: unknown;
+}
+
+/** 分批写入的回滚日志：每批落库前登记受影响主键，失败后按日志反向恢复 */
+export interface SyncJournalEntry {
+  id: string;
+  batchId: string;
+  seq: number;
+  table: 'specimens' | 'procedures' | 'supplies' | 'photos';
+  recordKey: string;
+  /** 合并前该行是否存在：不存在则回滚时删除 */
+  existed: boolean;
+  row?: unknown;
+  createdAt: number;
+}
 
 class FossilPrepDB extends Dexie {
   specimens!: Table<Specimen, string>;
   procedures!: Table<PrepProcedure, string>;
   supplies!: Table<SupplyLot, string>;
   photos!: Table<PrepPhoto, string>;
+  syncState!: Table<SyncStateRow, string>;
+  syncJournal!: Table<SyncJournalEntry, string>;
 
   constructor() {
     super(DB_NAME);
@@ -52,6 +77,26 @@ class FossilPrepDB extends Dexie {
           .modify((row: any) => {
             if (!row.issues) row.issues = [];
             if (row.lowThreshold === undefined) row.lowThreshold = 1;
+          });
+      });
+    // v3：工序修订号与两版待核；新增同步基线表与分批回滚日志表
+    this.version(3)
+      .stores({
+        specimens: 'id, specimenNo, taxon, locality, status, createdAt',
+        procedures: 'id, specimenId, seq, stepType, state, startedAt, conflictId',
+        supplies: 'id, kind, lotNo, name, openedAt',
+        photos: 'id, specimenId, procedureId, stage, capturedAt',
+        syncState: 'key',
+        syncJournal: 'id, batchId, seq',
+      })
+      .upgrade(async (tx) => {
+        // 旧数据无修订号：按当前值回填 rev=1，修订时间取开始时间
+        await tx
+          .table('procedures')
+          .toCollection()
+          .modify((row: any) => {
+            if (row.rev === undefined || row.rev === null) row.rev = 1;
+            if (row.updatedAt === undefined) row.updatedAt = row.startedAt ?? Date.now();
           });
       });
   }
@@ -138,6 +183,8 @@ export async function ensureSeedData(): Promise<void> {
       startedAt: now - 10 * day,
       state: 'done',
       finishedAt: now - 10 * day + 145 * 60000,
+      rev: 1,
+      updatedAt: now - 10 * day,
     },
     {
       id: newId('prc'),
@@ -157,6 +204,8 @@ export async function ensureSeedData(): Promise<void> {
       operator: '林砚秋',
       startedAt: now - 6 * day,
       state: 'pending',
+      rev: 1,
+      updatedAt: now - 6 * day,
     },
   ];
 
@@ -176,7 +225,7 @@ export async function ensureSeedData(): Promise<void> {
       procedureId: procedures[0].id,
       stage: 'after',
       caption: '清修后 · 肩胛骨轮廓显露',
-      dataUrl: makeSketchDataUrl('清修后 · FP-2024-0031', '#3f5a4a'),
+      dataUrl: makeSketchDataUrl('清修后 · FP-2024-0031', '#3f5a44'),
       capturedAt: now - 9 * day,
     },
   ];

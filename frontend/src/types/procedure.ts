@@ -43,7 +43,10 @@ export const STEP_FIELD_MAP: Record<
 /** 工序节点状态 */
 export type ProcedureState = 'pending' | 'done' | 'rolledback';
 
-/** 修复工序 */
+/** 修订来源 */
+export type RevisionSide = 'museum' | 'coop';
+
+/** 修复工序（v3 起带修订号；两版待核时各存一行） */
 export interface PrepProcedure {
   id: string;
   specimenId: string;
@@ -72,6 +75,61 @@ export interface PrepProcedure {
   startedAt: number;
   state: ProcedureState;
   finishedAt?: number;
+  /** 修订号：本机每次修改 +1；老数据（v1/v2）按当前值回填为 1 */
+  rev?: number;
+  /** 本次修订时间 */
+  updatedAt?: number;
+  /** 两版待核时，冲突双方共享同一分组 id；为空表示已核定的正常节点 */
+  conflictId?: string;
+  /** 该行修订的来源侧（仅 conflictId 非空时有意义） */
+  conflictSide?: RevisionSide;
+  /** 对侧修订号（仅两版待核行使用，便于核对） */
+  conflictOtherRev?: number;
 }
 
 export type PrepProcedureDraft = Omit<PrepProcedure, 'id'>;
+
+/** 两版待核分组（供待核 UI 使用） */
+export interface ProcedureConflict {
+  conflictId: string;
+  specimenId: string;
+  museum?: PrepProcedure;
+  coop?: PrepProcedure;
+}
+
+/** 参与修订比较 / 归并的字段（不含 id、修订元数据与影像挂接数组） */
+export const PROCEDURE_BUSINESS_FIELDS: (keyof PrepProcedure)[] = [
+  'specimenId',
+  'stepType',
+  'nodeName',
+  'seq',
+  'tools',
+  'abrasive',
+  'adhesive',
+  'adhesiveConc',
+  'durationMin',
+  'tempC',
+  'rh',
+  'operator',
+  'startedAt',
+  'state',
+  'finishedAt',
+];
+
+export const PROCEDURE_LABELS: Record<string, string> = {
+  specimenId: '所属标本',
+  stepType: '工序类型',
+  nodeName: '节点名称',
+  seq: '序号',
+  tools: '工具',
+  abrasive: '磨料',
+  adhesive: '胶种',
+  adhesiveConc: '胶液浓度(%)',
+  durationMin: '耗时(min)',
+  tempC: '环境温度(℃)',
+  rh: '相对湿度(%)',
+  operator: '责任人',
+  startedAt: '开始时间',
+  state: '状态',
+  finishedAt: '完成时间',
+};
